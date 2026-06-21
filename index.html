@@ -204,6 +204,19 @@ main {
 }
 .add-btn:active { background: #3a7bc8; transform: scale(.98); }
 
+.cancel-edit-btn {
+  width: 100%;
+  background: none;
+  color: var(--mid);
+  border: none;
+  padding: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* ── STATS ── */
 .stats-bar {
   display: flex;
@@ -282,6 +295,20 @@ main {
   margin-bottom: 8px;
 }
 .card-title { font-weight: 600; font-size: 0.95rem; line-height: 1.3; flex: 1; }
+
+.card-actions { display: flex; gap: 2px; flex-shrink: 0; }
+
+.card-edit {
+  background: none;
+  border: none;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  -webkit-tap-highlight-color: transparent;
+}
+.card-edit:active { color: var(--sky); }
 
 .card-delete {
   background: none;
@@ -509,6 +536,7 @@ main {
   font-size: 0.82rem;
 }
 .k-card-title { font-weight: 600; margin-bottom: 5px; line-height: 1.3; }
+.k-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
 .k-card-meta { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
 
 /* ── EMPTY / LOADING ── */
@@ -609,6 +637,70 @@ main {
   font-size: 0.92rem;
 }
 
+/* ── LOCK SCREEN ── */
+.lock-screen {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, #4A90D9 0%, #2471B8 60%, #1a5a99 100%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.lock-box {
+  background: white;
+  border-radius: 20px;
+  padding: 36px 28px;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.lock-icon { font-size: 2.8rem; margin-bottom: 8px; }
+.lock-box h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.4rem;
+  color: var(--dark);
+  margin-bottom: 4px;
+}
+.lock-box p { color: var(--mid); font-size: 0.88rem; margin-bottom: 18px; }
+.lock-box input {
+  width: 100%;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 1.1rem;
+  text-align: center;
+  letter-spacing: 2px;
+  outline: none;
+  margin-bottom: 14px;
+  background: var(--sand);
+  -webkit-appearance: none;
+}
+.lock-box input:focus { border-color: var(--sky); background: white; }
+.lock-btn {
+  width: 100%;
+  background: var(--sky);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 13px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.lock-btn:active { background: #3a7bc8; }
+.lock-error {
+  color: var(--coral) !important;
+  font-size: 0.82rem !important;
+  margin-top: 10px !important;
+  margin-bottom: 0 !important;
+  display: none;
+}
+.lock-error.show { display: block; }
+
 /* ── OFFLINE BANNER ── */
 .offline-banner {
   display: none;
@@ -632,6 +724,20 @@ main {
 </style>
 </head>
 <body>
+
+<!-- ═══ LOCK SCREEN ═══ -->
+<div id="lockScreen" class="lock-screen">
+  <div class="lock-box">
+    <div class="lock-icon">🔒</div>
+    <h2>CADA Events</h2>
+    <p>Accès privé — entrez le code</p>
+    <input type="password" id="lockInput" inputmode="numeric" autocomplete="off" placeholder="••••••••" />
+    <button class="lock-btn" onclick="checkPassword()">Déverrouiller</button>
+    <p class="lock-error" id="lockError">Code incorrect, réessayez.</p>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none">
 
 <div class="offline-banner" id="offline-banner">📶 Hors ligne — les modifications seront synchronisées dès la reconnexion</div>
 
@@ -659,7 +765,7 @@ main {
 
     <div class="add-form">
       <div class="form-toggle" onclick="toggleForm()">
-        <h3>✨ Ajouter un événement</h3>
+        <h3 id="form-title">✨ Ajouter un événement</h3>
         <span class="form-toggle-icon" id="form-icon">+</span>
       </div>
       <div class="form-body" id="form-body">
@@ -700,7 +806,8 @@ main {
           <label>Note (optionnel)</label>
           <input type="text" id="inp-note" placeholder="Commentaire…" />
         </div>
-        <button class="add-btn" onclick="addIdea()">+ Ajouter et partager</button>
+        <button class="add-btn" id="submit-btn" onclick="addIdea()">+ Ajouter et partager</button>
+        <button class="cancel-edit-btn" id="cancel-edit-btn" onclick="cancelEdit()" style="display:none">Annuler la modification</button>
       </div>
     </div>
 
@@ -740,19 +847,20 @@ main {
   </div>
 </div>
 
+</div><!-- /#appRoot -->
+
 <script>
 // ═══════════════════════════════════════════════
 // 🔥 FIREBASE CONFIG — Remplacer par vos valeurs
 // ═══════════════════════════════════════════════
-  const firebaseConfig = {
-    apiKey: "AIzaSyBU6dcwo7keCH-2VNyx2KlM6oxhkp2gLiE",
-    authDomain: "cada-events.firebaseapp.com",
-    projectId: "cada-events",
-    storageBucket: "cada-events.firebasestorage.app",
-    messagingSenderId: "1042507286975",
-    appId: "1:1042507286975:web:00f023b8a75da01d5a390a",
-    measurementId: "G-VEVWVC1WNH"
-  };
+const firebaseConfig = {
+  apiKey:            "VOTRE_API_KEY",
+  authDomain:        "VOTRE_PROJECT.firebaseapp.com",
+  projectId:         "VOTRE_PROJECT_ID",
+  storageBucket:     "VOTRE_PROJECT.appspot.com",
+  messagingSenderId: "VOTRE_SENDER_ID",
+  appId:             "VOTRE_APP_ID"
+};
 
 // ══════════════
 // CONFIG THÈMES
@@ -798,6 +906,7 @@ let formOpen = false;
 let db = null;
 let unsubscribe = null;
 let viewYear = new Date().getFullYear();
+let editingId = null;
 
 // ══════════════
 // FIREBASE INIT
@@ -839,6 +948,14 @@ async function addIdeaToFirestore(idea) {
   await db.collection('ideas').add({
     ...idea,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+async function updateIdeaInFirestore(id, idea) {
+  setSyncStatus('syncing');
+  await db.collection('ideas').doc(id).update({
+    ...idea,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   });
 }
 
@@ -891,11 +1008,53 @@ function toggleForm() {
   const icon = document.getElementById('form-icon');
   icon.textContent = formOpen ? '✕' : '+';
   icon.classList.toggle('open', formOpen);
+  if (!formOpen && editingId) cancelEdit();
+}
+
+function openFormIfClosed() {
+  if (!formOpen) {
+    formOpen = true;
+    document.getElementById('form-body').classList.add('open');
+    const icon = document.getElementById('form-icon');
+    icon.textContent = '✕';
+    icon.classList.add('open');
+  }
+}
+
+function editIdea(id) {
+  const idea = ideas.find(i => i.id === id);
+  if (!idea) return;
+
+  editingId = id;
+  document.getElementById('inp-title').value = idea.title || '';
+  document.getElementById('inp-url').value = idea.url || '';
+  document.getElementById('inp-date').value = idea.date || '';
+  document.getElementById('inp-theme').value = idea.theme || 'autre';
+  document.getElementById('inp-who').value = idea.who || currentUser;
+  document.getElementById('inp-note').value = idea.note || '';
+
+  document.getElementById('form-title').textContent = '✏️ Modifier l\'événement';
+  document.getElementById('submit-btn').textContent = '✓ Enregistrer les modifications';
+  document.getElementById('cancel-edit-btn').style.display = 'block';
+
+  openFormIfClosed();
+  showView('list', document.querySelector('.tab'));
+  document.getElementById('inp-title').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelEdit() {
+  editingId = null;
+  ['inp-title','inp-url','inp-note','inp-date'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('inp-theme').value = 'sortie';
+  document.getElementById('inp-who').value = currentUser;
+  document.getElementById('form-title').textContent = '✨ Ajouter un événement';
+  document.getElementById('submit-btn').textContent = '+ Ajouter et partager';
+  document.getElementById('cancel-edit-btn').style.display = 'none';
 }
 
 async function addIdea() {
   const title = document.getElementById('inp-title').value.trim();
-  if (!title) { showToast('⚠️ Donnez un titre à votre idée'); return; }
+  if (!title) { showToast('⚠️ Donnez un titre à votre événement'); return; }
 
   const idea = {
     title,
@@ -906,15 +1065,33 @@ async function addIdea() {
     note:  document.getElementById('inp-note').value.trim()
   };
 
+  if (editingId) {
+    // ── MODE ÉDITION ──
+    const idToUpdate = editingId;
+    try {
+      await updateIdeaInFirestore(idToUpdate, idea);
+      showToast('✅ Événement modifié !');
+    } catch(e) {
+      console.error(e);
+      const i = ideas.find(x => x.id === idToUpdate);
+      if (i) Object.assign(i, idea);
+      saveLocalFallback();
+      render();
+      showToast('📴 Modifié localement (hors ligne)');
+    }
+    cancelEdit();
+    toggleForm();
+    return;
+  }
+
+  // ── MODE AJOUT ──
   try {
     await addIdeaToFirestore(idea);
-    // Reset form
     ['inp-title','inp-url','inp-note','inp-date'].forEach(id => document.getElementById(id).value = '');
     toggleForm();
-    showToast('✅ Idée partagée en temps réel !');
+    showToast('✅ Événement partagé en temps réel !');
   } catch(e) {
     console.error(e);
-    // Fallback local
     ideas.unshift({ id: 'local-' + Date.now(), ...idea });
     saveLocalFallback();
     render();
@@ -1012,7 +1189,10 @@ function renderCards() {
       <div class="card-accent" style="background:${th.color}"></div>
       <div class="card-top">
         <div class="card-title">${esc(idea.title)}</div>
-        <button class="card-delete" onclick="askDelete('${idea.id}')">✕</button>
+        <div class="card-actions">
+          <button class="card-edit" onclick="editIdea('${idea.id}')" title="Modifier">✏️</button>
+          <button class="card-delete" onclick="askDelete('${idea.id}')" title="Supprimer">✕</button>
+        </div>
       </div>
       <div class="card-meta">
         <span class="theme-pill" style="background:${th.color}">${th.icon} ${th.label}</span>
@@ -1123,7 +1303,10 @@ function renderKanban() {
           const u = USERS[idea.who]||USERS.ahmed;
           const dateStr = idea.date ? new Date(idea.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}) : '';
           return `<div class="k-card" style="border-left-color:${th.color}">
-            <div class="k-card-title">${esc(idea.title)}</div>
+            <div class="k-card-top">
+              <div class="k-card-title">${esc(idea.title)}</div>
+              <button class="card-edit" onclick="editIdea('${idea.id}')" title="Modifier" style="flex-shrink:0">✏️</button>
+            </div>
             <div class="k-card-meta">
               ${dateStr?`<span class="card-date" style="font-size:0.72rem">📅 ${dateStr}</span>`:''}
               <span style="font-size:0.7rem;font-weight:600;color:${u.color};background:${u.bg};padding:2px 6px;border-radius:8px">${u.label}</span>
@@ -1162,14 +1345,51 @@ window.addEventListener('offline', () => { document.getElementById('offline-bann
 // SERVICE WORKER
 // ══════════════
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(console.warn);
+  navigator.serviceWorker.register('./sw.js').catch(console.warn);
 }
 
 // ══════════
 // INIT
 // ══════════
-initUser();
-initFirebase();
+// ══════════════
+// LOCK SCREEN
+// ══════════════
+// Mot de passe encodé en base64 (obfuscation légère, pas un vrai chiffrement)
+const LOCK_HASH = 'Y2FkYTEyMw==';
+const LOCK_SESSION_KEY = 'cada-unlocked';
+
+function checkPassword() {
+  const input = document.getElementById('lockInput');
+  const entered = input.value.trim();
+  if (btoa(entered) === LOCK_HASH) {
+    sessionStorage.setItem(LOCK_SESSION_KEY, '1');
+    unlockApp();
+  } else {
+    document.getElementById('lockError').classList.add('show');
+    input.value = '';
+    input.focus();
+  }
+}
+
+function unlockApp() {
+  document.getElementById('lockScreen').style.display = 'none';
+  document.getElementById('appRoot').style.display = '';
+  initUser();
+  initFirebase();
+}
+
+document.getElementById('lockInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') checkPassword();
+});
+
+// ══════════
+// INIT
+// ══════════
+if (sessionStorage.getItem(LOCK_SESSION_KEY) === '1') {
+  unlockApp();
+} else {
+  document.getElementById('lockInput').focus();
+}
 </script>
 </body>
 </html>

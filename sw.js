@@ -1,8 +1,8 @@
-const CACHE_NAME = 'cada-events-v1';
+const CACHE_NAME = 'cada-events-v2';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
+  './',
+  './index.html',
+  './manifest.json',
   'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&display=swap'
 ];
 
