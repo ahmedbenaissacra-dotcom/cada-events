@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#4A90D9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CADA Events">
+<title>CADA Events 🗓️</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- Firebase v9 compat (CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sky: #4A90D9;
+  --coral: #FF6B6B;
+  --sand: #FFF8F0;
+  --leaf: #2ECC71;
+  --amber: #F39C12;
+  --lavender: #9B59B6;
+  --dark: #1A1A2E;
+  --mid: #666680;
+  --border: #e8e0d8;
+  --card: #ffffff;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html { height: 100%; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--sand);
+  color: var(--dark);
+  min-height: 100vh;
+  overscroll-behavior: none;
+}
+
+/* ── HEADER ── */
+header {
+  background: linear-gradient(135deg, #4A90D9 0%, #2471B8 60%, #1a5a99 100%);
+  color: white;
+  padding: calc(16px + var(--safe-top)) 16px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 3px 16px rgba(74,144,217,.35);
+}
+
+header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(1.1rem, 5vw, 1.6rem);
+}
+header h1 span { color: #FFE066; }
+
+.header-right { display: flex; align-items: center; gap: 8px; }
+
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.18);
+  border: 1.5px solid rgba(255,255,255,.35);
+  border-radius: 20px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.user-badge:active { background: rgba(255,255,255,.32); }
+.user-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+.sync-indicator {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #2ECC71;
+  flex-shrink: 0;
+  transition: background .3s;
+}
+.sync-indicator.syncing { background: #FFE066; animation: pulse .8s infinite; }
+.sync-indicator.offline { background: var(--coral); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── TABS ── */
+.tabs {
+  display: flex;
+  background: white;
+  border-bottom: 2px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  flex: 1;
+  min-width: 80px;
+  padding: 11px 8px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--mid);
+  border-bottom: 3px solid transparent;
+  transition: all .2s;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab.active { color: var(--sky); border-bottom-color: var(--sky); font-weight: 700; }
+
+/* ── MAIN ── */
+main {
+  padding: 16px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding-bottom: calc(24px + var(--safe-bottom));
+}
+
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── ADD FORM ── */
+.add-form {
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.04);
+}
+
+.form-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.form-toggle h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1rem;
+}
+.form-toggle-icon { font-size: 1.2rem; transition: transform .25s; }
+.form-toggle-icon.open { transform: rotate(45deg); }
+
+.form-body { display: none; margin-top: 14px; }
+.form-body.open { display: block; }
+
+.form-field { margin-bottom: 10px; }
+.form-field label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--mid);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 4px;
+}
+.form-field input,
+.form-field select,
+.form-field textarea {
+  width: 100%;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.92rem;
+  color: var(--dark);
+  background: var(--sand);
+  transition: border-color .2s;
+  outline: none;
+  -webkit-appearance: none;
+}
+.form-field input:focus,
+.form-field select:focus { border-color: var(--sky); background: white; }
+
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.add-btn {
+  width: 100%;
+  background: var(--sky);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background .2s, transform .1s;
+  margin-top: 4px;
+  -webkit-tap-highlight-color: transparent;
+}
+.add-btn:active { background: #3a7bc8; transform: scale(.98); }
+
+/* ── STATS ── */
+.stats-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.stat-chip {
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stat-chip strong { color: var(--sky); }
+
+/* ── FILTERS ── */
+.filter-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+  margin-bottom: 14px;
+}
+.filter-scroll::-webkit-scrollbar { display: none; }
+
+.filter-btn {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: white;
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all .2s;
+  color: var(--dark);
+  -webkit-tap-highlight-color: transparent;
+}
+.filter-btn.active {
+  background: var(--sky);
+  color: white;
+  border-color: var(--sky);
+}
+
+/* ── CARDS ── */
+.cards-list { display: flex; flex-direction: column; gap: 12px; }
+
+.idea-card {
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 14px 14px 18px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.04);
+  position: relative;
+  transition: box-shadow .2s;
+}
+.idea-card:active { box-shadow: 0 4px 14px rgba(0,0,0,.1); }
+
+.card-accent {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 5px;
+  border-radius: 14px 0 0 14px;
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.card-title { font-weight: 600; font-size: 0.95rem; line-height: 1.3; flex: 1; }
+
+.card-delete {
+  background: none;
+  border: none;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.card-delete:active { color: var(--coral); }
+
+.card-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+
+.theme-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: white;
+  white-space: nowrap;
+}
+
+.card-date {
+  font-size: 0.75rem;
+  color: var(--mid);
+  background: #f5f5f8;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
+.card-who {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.82rem;
+  color: var(--sky);
+  text-decoration: none;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.card-note {
+  font-size: 0.8rem;
+  color: var(--mid);
+  margin-top: 6px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* ── YEAR NAV ── */
+.year-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.year-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: white;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--sky);
+  font-weight: 700;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.year-btn:active { background: var(--sky); color: white; }
+.year-label {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.3rem;
+  font-weight: 900;
+  min-width: 70px;
+  text-align: center;
+  color: var(--dark);
+}
+.year-today-btn {
+  margin-left: auto;
+  border: 1.5px solid var(--sky);
+  color: var(--sky);
+  background: white;
+  border-radius: 18px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.year-today-btn:active { background: var(--sky); color: white; }
+
+/* ── TIMELINE (12-month grid, any year) ── */
+.timeline-grid-12 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.month-block {
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.month-block.is-current-month { border-color: var(--sky); border-width: 2px; }
+
+.month-block-header {
+  padding: 7px 10px;
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.month-block-body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 44px;
+}
+.month-block-body .t-empty {
+  color: #ccc;
+  font-size: 0.72rem;
+  padding: 4px 2px;
+}
+
+.t-bubble {
+  display: block;
+  padding: 5px 8px;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.3;
+  box-shadow: 0 1px 4px rgba(0,0,0,.15);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.t-bubble .bday { display: block; font-size: 0.65rem; opacity: .85; }
+
+@media (max-width: 420px) {
+  .timeline-grid-12 { grid-template-columns: 1fr; }
+}
+
+.no-date-section {
+  margin-top: 16px;
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.no-date-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--mid);
+  margin-bottom: 8px;
+}
+.no-date-bubbles { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ── KANBAN ── */
+.kanban-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+.kanban-scroll::-webkit-scrollbar { height: 4px; }
+.kanban-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.k-col { min-width: 220px; flex-shrink: 0; }
+
+.k-col-header {
+  padding: 9px 12px;
+  border-radius: 10px 10px 0 0;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.k-count {
+  background: rgba(255,255,255,.3);
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 0.72rem;
+}
+
+.k-col-body {
+  background: white;
+  border: 1.5px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  padding: 8px;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.k-card {
+  background: var(--sand);
+  border: 1.5px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 0.82rem;
+}
+.k-card-title { font-weight: 600; margin-bottom: 5px; line-height: 1.3; }
+.k-card-meta { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+
+/* ── EMPTY / LOADING ── */
+.empty {
+  text-align: center;
+  padding: 40px 16px;
+  color: var(--mid);
+}
+.empty .icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px;
+  color: var(--mid);
+  font-size: 0.9rem;
+}
+.spinner {
+  width: 20px; height: 20px;
+  border: 3px solid var(--border);
+  border-top-color: var(--sky);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed;
+  bottom: calc(20px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--dark);
+  color: white;
+  padding: 11px 20px;
+  border-radius: 24px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  opacity: 0;
+  transition: all .3s;
+  z-index: 500;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+}
+.toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+/* ── MODAL ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(26,26,46,.55);
+  z-index: 300;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: var(--safe-bottom);
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: white;
+  border-radius: 20px 20px 0 0;
+  padding: 24px 20px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 -8px 30px rgba(0,0,0,.15);
+}
+.modal h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+}
+.modal p { color: var(--mid); font-size: 0.88rem; line-height: 1.5; }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+.btn-cancel {
+  flex: 1;
+  padding: 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: white;
+  cursor: pointer;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.btn-confirm {
+  flex: 1;
+  padding: 12px;
+  background: var(--coral);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+/* ── OFFLINE BANNER ── */
+.offline-banner {
+  display: none;
+  background: #fff3cd;
+  color: #856404;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 6px;
+}
+.offline-banner.show { display: block; }
+
+@media (min-width: 600px) {
+  .cards-list { display: grid; grid-template-columns: repeat(2, 1fr); }
+  .form-row-2 { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (min-width: 900px) {
+  .cards-list { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<div class="offline-banner" id="offline-banner">📶 Hors ligne — les modifications seront synchronisées dès la reconnexion</div>
+
+<header>
+  <h1>CADA <span>Events</span> 🗓️</h1>
+  <div class="header-right">
+    <div class="sync-indicator" id="syncDot" title="Statut sync"></div>
+    <div class="user-badge" onclick="switchUser()">
+      <div class="user-dot" id="userDot"></div>
+      <span id="userName">Ahmed</span>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="tab active" onclick="showView('list', this)">📋 Liste</div>
+  <div class="tab" onclick="showView('timeline', this)">📅 Timeline</div>
+  <div class="tab" onclick="showView('kanban', this)">🗂️ Thèmes</div>
+</nav>
+
+<main>
+
+  <!-- LIST VIEW -->
+  <div id="view-list" class="view active">
+
+    <div class="add-form">
+      <div class="form-toggle" onclick="toggleForm()">
+        <h3>✨ Ajouter un événement</h3>
+        <span class="form-toggle-icon" id="form-icon">+</span>
+      </div>
+      <div class="form-body" id="form-body">
+        <div class="form-field">
+          <label>Titre *</label>
+          <input type="text" id="inp-title" placeholder="Ex : Pique-nique forêt de Fontainebleau, anniversaire, voyage…" />
+        </div>
+        <div class="form-field">
+          <label>Lien web</label>
+          <input type="url" id="inp-url" placeholder="https://…" inputmode="url" />
+        </div>
+        <div class="form-row-2">
+          <div class="form-field">
+            <label>Date</label>
+            <input type="date" id="inp-date" />
+          </div>
+          <div class="form-field">
+            <label>Thème</label>
+            <select id="inp-theme">
+              <option value="sortie">🌳 Sortie / Balade</option>
+              <option value="culture">🎭 Culture</option>
+              <option value="famille">👨‍👩‍👧 Famille</option>
+              <option value="gastronomie">🍽️ Gastronomie</option>
+              <option value="voyage">✈️ Voyage</option>
+              <option value="sport">⚽ Sport / Jeux</option>
+              <option value="autre">💡 Autre</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Ajouté par</label>
+            <select id="inp-who">
+              <option value="ahmed">Ahmed</option>
+              <option value="chloe">Chloé</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-field">
+          <label>Note (optionnel)</label>
+          <input type="text" id="inp-note" placeholder="Commentaire…" />
+        </div>
+        <button class="add-btn" onclick="addIdea()">+ Ajouter et partager</button>
+      </div>
+    </div>
+
+    <div class="stats-bar" id="stats-bar"></div>
+    <div class="filter-scroll" id="filter-bar"></div>
+    <div id="cards-container"><div class="loading"><div class="spinner"></div> Chargement…</div></div>
+  </div>
+
+  <!-- TIMELINE VIEW -->
+  <div id="view-timeline" class="view">
+    <div class="year-nav">
+      <button class="year-btn" onclick="changeYear(-1)">‹</button>
+      <div class="year-label" id="year-label">2026</div>
+      <button class="year-btn" onclick="changeYear(1)">›</button>
+      <button class="year-today-btn" onclick="goToCurrentYear()">Aujourd'hui</button>
+    </div>
+    <div id="timeline-container"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <!-- KANBAN VIEW -->
+  <div id="view-kanban" class="view">
+    <div class="kanban-scroll" id="kanban-board"></div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal">
+    <h3>Supprimer cette idée ?</h3>
+    <p>Elle sera supprimée pour vous deux. Cette action est irréversible.</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-confirm" onclick="confirmDelete()">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// 🔥 FIREBASE CONFIG — Remplacer par vos valeurs
+// ═══════════════════════════════════════════════
+  const firebaseConfig = {
+    apiKey: "AIzaSyBU6dcwo7keCH-2VNyx2KlM6oxhkp2gLiE",
+    authDomain: "cada-events.firebaseapp.com",
+    projectId: "cada-events",
+    storageBucket: "cada-events.firebasestorage.app",
+    messagingSenderId: "1042507286975",
+    appId: "1:1042507286975:web:00f023b8a75da01d5a390a",
+    measurementId: "G-VEVWVC1WNH"
+  };
+
+// ══════════════
+// CONFIG THÈMES
+// ══════════════
+const THEMES = {
+  sortie:      { label: 'Sortie / Balade', color: '#2ECC71', icon: '🌳' },
+  culture:     { label: 'Culture',          color: '#9B59B6', icon: '🎭' },
+  famille:     { label: 'Famille',          color: '#E67E22', icon: '👨‍👩‍👧' },
+  gastronomie: { label: 'Gastronomie',      color: '#E74C3C', icon: '🍽️' },
+  voyage:      { label: 'Voyage',           color: '#4A90D9', icon: '✈️' },
+  sport:       { label: 'Sport / Jeux',     color: '#F39C12', icon: '⚽' },
+  autre:       { label: 'Autre',            color: '#95A5A6', icon: '💡' }
+};
+
+const USERS = {
+  ahmed: { label: 'Ahmed',  color: '#4A90D9', bg: '#e8f2fc' },
+  chloe: { label: 'Chloé',  color: '#FF6B6B', bg: '#fff0f0' }
+};
+
+const ALL_MONTHS = [
+  { label: 'Janvier',  num: 1,  color: '#4A90D9' },
+  { label: 'Février',  num: 2,  color: '#9B59B6' },
+  { label: 'Mars',     num: 3,  color: '#2ECC71' },
+  { label: 'Avril',    num: 4,  color: '#F39C12' },
+  { label: 'Mai',      num: 5,  color: '#E67E22' },
+  { label: 'Juin',     num: 6,  color: '#4A90D9' },
+  { label: 'Juillet',  num: 7,  color: '#FF6B6B' },
+  { label: 'Août',     num: 8,  color: '#2ECC71' },
+  { label: 'Septembre',num: 9,  color: '#F39C12' },
+  { label: 'Octobre',  num: 10, color: '#9B59B6' },
+  { label: 'Novembre', num: 11, color: '#34495E' },
+  { label: 'Décembre', num: 12, color: '#E74C3C' }
+];
+
+// ══════════
+// STATE
+// ══════════
+let ideas = [];
+let currentUser = localStorage.getItem('cada-user') || 'ahmed';
+let filterTheme = 'all';
+let deleteTarget = null;
+let formOpen = false;
+let db = null;
+let unsubscribe = null;
+let viewYear = new Date().getFullYear();
+
+// ══════════════
+// FIREBASE INIT
+// ══════════════
+function initFirebase() {
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    setSyncStatus('syncing');
+    startRealTimeSync();
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    setSyncStatus('offline');
+    showToast('⚠️ Erreur Firebase — vérifiez la config');
+    ideas = getLocalFallback();
+    render();
+  }
+}
+
+function startRealTimeSync() {
+  if (unsubscribe) unsubscribe();
+  unsubscribe = db.collection('ideas')
+    .orderBy('createdAt', 'desc')
+    .onSnapshot(snapshot => {
+      ideas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSyncStatus('online');
+      render();
+      if (document.getElementById('view-timeline').classList.contains('active')) renderTimeline();
+      if (document.getElementById('view-kanban').classList.contains('active')) renderKanban();
+    }, err => {
+      console.error(err);
+      setSyncStatus('offline');
+      showToast('⚠️ Sync interrompue — mode hors ligne');
+    });
+}
+
+async function addIdeaToFirestore(idea) {
+  setSyncStatus('syncing');
+  await db.collection('ideas').add({
+    ...idea,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+async function deleteIdeaFromFirestore(id) {
+  setSyncStatus('syncing');
+  await db.collection('ideas').doc(id).delete();
+}
+
+function getLocalFallback() {
+  try { return JSON.parse(localStorage.getItem('cada-ideas') || '[]'); } catch { return []; }
+}
+
+function saveLocalFallback() {
+  try { localStorage.setItem('cada-ideas', JSON.stringify(ideas)); } catch {}
+}
+
+// ══════════════
+// SYNC STATUS
+// ══════════════
+function setSyncStatus(status) {
+  const dot = document.getElementById('syncDot');
+  dot.className = 'sync-indicator';
+  if (status === 'syncing') dot.classList.add('syncing');
+  if (status === 'offline') dot.classList.add('offline');
+}
+
+// ══════════════
+// USER
+// ══════════════
+function initUser() {
+  document.getElementById('userDot').style.background = USERS[currentUser].color;
+  document.getElementById('userName').textContent = USERS[currentUser].label;
+  document.getElementById('inp-who').value = currentUser;
+}
+
+function switchUser() {
+  currentUser = currentUser === 'ahmed' ? 'chloe' : 'ahmed';
+  localStorage.setItem('cada-user', currentUser);
+  initUser();
+  render();
+  showToast(`👤 ${USERS[currentUser].label}`);
+}
+
+// ══════════════
+// FORM
+// ══════════════
+function toggleForm() {
+  formOpen = !formOpen;
+  document.getElementById('form-body').classList.toggle('open', formOpen);
+  const icon = document.getElementById('form-icon');
+  icon.textContent = formOpen ? '✕' : '+';
+  icon.classList.toggle('open', formOpen);
+}
+
+async function addIdea() {
+  const title = document.getElementById('inp-title').value.trim();
+  if (!title) { showToast('⚠️ Donnez un titre à votre idée'); return; }
+
+  const idea = {
+    title,
+    url:   document.getElementById('inp-url').value.trim(),
+    date:  document.getElementById('inp-date').value,
+    theme: document.getElementById('inp-theme').value,
+    who:   document.getElementById('inp-who').value,
+    note:  document.getElementById('inp-note').value.trim()
+  };
+
+  try {
+    await addIdeaToFirestore(idea);
+    // Reset form
+    ['inp-title','inp-url','inp-note','inp-date'].forEach(id => document.getElementById(id).value = '');
+    toggleForm();
+    showToast('✅ Idée partagée en temps réel !');
+  } catch(e) {
+    console.error(e);
+    // Fallback local
+    ideas.unshift({ id: 'local-' + Date.now(), ...idea });
+    saveLocalFallback();
+    render();
+    showToast('📴 Sauvegardé localement (hors ligne)');
+  }
+}
+
+// ══════════════
+// DELETE
+// ══════════════
+function askDelete(id) {
+  deleteTarget = id;
+  document.getElementById('deleteModal').classList.add('open');
+}
+function closeModal() {
+  deleteTarget = null;
+  document.getElementById('deleteModal').classList.remove('open');
+}
+async function confirmDelete() {
+  try {
+    await deleteIdeaFromFirestore(deleteTarget);
+    showToast('🗑️ Idée supprimée');
+  } catch(e) {
+    ideas = ideas.filter(i => i.id !== deleteTarget);
+    saveLocalFallback();
+    render();
+    showToast('🗑️ Supprimée localement');
+  }
+  closeModal();
+}
+
+// ══════════════
+// VIEWS
+// ══════════════
+function showView(name, tab) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  tab.classList.add('active');
+  if (name === 'timeline') renderTimeline();
+  if (name === 'kanban') renderKanban();
+}
+
+// ══════════════
+// RENDER LIST
+// ══════════════
+function render() {
+  renderStats();
+  renderFilters();
+  renderCards();
+}
+
+function renderStats() {
+  const bar = document.getElementById('stats-bar');
+  bar.innerHTML = `
+    <div class="stat-chip">📌 <strong>${ideas.length}</strong> idées</div>
+    <div class="stat-chip" style="color:${USERS.ahmed.color}">Ahmed <strong>${ideas.filter(i=>i.who==='ahmed').length}</strong></div>
+    <div class="stat-chip" style="color:${USERS.chloe.color}">Chloé <strong>${ideas.filter(i=>i.who==='chloe').length}</strong></div>
+    <div class="stat-chip">📅 <strong>${ideas.filter(i=>i.date).length}</strong> planifiées</div>
+  `;
+}
+
+function renderFilters() {
+  let html = `<button class="filter-btn ${filterTheme==='all'?'active':''}" onclick="setFilter('all')">Tous (${ideas.length})</button>`;
+  for (const [key, t] of Object.entries(THEMES)) {
+    const count = ideas.filter(i=>i.theme===key).length;
+    if (count > 0)
+      html += `<button class="filter-btn ${filterTheme===key?'active':''}" onclick="setFilter('${key}')">${t.icon} ${t.label} (${count})</button>`;
+  }
+  document.getElementById('filter-bar').innerHTML = html;
+}
+
+function setFilter(t) { filterTheme = t; renderFilters(); renderCards(); }
+
+function renderCards() {
+  const c = document.getElementById('cards-container');
+  let list = filterTheme === 'all' ? [...ideas] : ideas.filter(i=>i.theme===filterTheme);
+  list.sort((a,b)=>{
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return new Date(a.date) - new Date(b.date);
+  });
+
+  if (!list.length) {
+    c.innerHTML = `<div class="empty"><div class="icon">🌴</div><p>Aucune idée pour ce filtre.<br>Ajoutez la première !</p></div>`;
+    return;
+  }
+
+  c.innerHTML = `<div class="cards-list">${list.map(idea => {
+    const th = THEMES[idea.theme] || THEMES.autre;
+    const u = USERS[idea.who] || USERS.ahmed;
+    const dateStr = idea.date ? new Date(idea.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'}) : '';
+    return `<div class="idea-card">
+      <div class="card-accent" style="background:${th.color}"></div>
+      <div class="card-top">
+        <div class="card-title">${esc(idea.title)}</div>
+        <button class="card-delete" onclick="askDelete('${idea.id}')">✕</button>
+      </div>
+      <div class="card-meta">
+        <span class="theme-pill" style="background:${th.color}">${th.icon} ${th.label}</span>
+        ${dateStr ? `<span class="card-date">📅 ${dateStr}</span>` : ''}
+        <span class="card-who" style="color:${u.color};background:${u.bg}">${u.label}</span>
+      </div>
+      ${idea.url ? `<a href="${esc(idea.url)}" target="_blank" rel="noopener" class="card-link">🔗 Voir le lien</a>` : ''}
+      ${idea.note ? `<div class="card-note">"${esc(idea.note)}"</div>` : ''}
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// ══════════════
+// YEAR NAV
+// ══════════════
+function changeYear(delta) {
+  viewYear += delta;
+  renderTimeline();
+}
+function goToCurrentYear() {
+  viewYear = new Date().getFullYear();
+  renderTimeline();
+}
+
+// ══════════════
+// RENDER TIMELINE (works for any year, forever)
+// ══════════════
+function renderTimeline() {
+  document.getElementById('year-label').textContent = viewYear;
+
+  const c = document.getElementById('timeline-container');
+  const now = new Date();
+  const isCurrentYear = viewYear === now.getFullYear();
+  const currentMonthNum = now.getMonth() + 1;
+
+  // Bucket ideas that have a date AND match the viewed year
+  const buckets = {};
+  ALL_MONTHS.forEach(m => buckets[m.num] = []);
+  const undatedAll = ideas.filter(i => !i.date);
+  const datedThisYear = ideas
+    .filter(i => i.date && new Date(i.date + 'T00:00:00').getFullYear() === viewYear)
+    .sort((a,b) => new Date(a.date) - new Date(b.date));
+
+  datedThisYear.forEach(idea => {
+    const m = new Date(idea.date + 'T00:00:00').getMonth() + 1;
+    buckets[m].push(idea);
+  });
+
+  let html = `<div class="timeline-grid-12">`;
+  ALL_MONTHS.forEach(m => {
+    const items = buckets[m.num] || [];
+    const isNowMonth = isCurrentYear && m.num === currentMonthNum;
+    html += `<div class="month-block ${isNowMonth ? 'is-current-month' : ''}">
+      <div class="month-block-header" style="background:${m.color}">
+        <span>${m.label}</span>
+        ${items.length ? `<span>${items.length}</span>` : ''}
+      </div>
+      <div class="month-block-body">
+        ${items.length ? items.map(idea => {
+          const th = THEMES[idea.theme] || THEMES.autre;
+          const day = new Date(idea.date + 'T00:00:00').getDate();
+          const tag = idea.url ? 'a' : 'span';
+          const attrs = idea.url ? `href="${esc(idea.url)}" target="_blank" rel="noopener"` : '';
+          return `<${tag} ${attrs} class="t-bubble" style="background:${th.color}">
+            <span class="bday">${th.icon} ${day} ${m.label}</span>
+            ${esc(idea.title.length > 30 ? idea.title.slice(0,28) + '…' : idea.title)}
+          </${tag}>`;
+        }).join('') : `<span class="t-empty">Rien encore…</span>`}
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  if (undatedAll.length) {
+    html += `<div class="no-date-section">
+      <div class="no-date-title">📌 Sans date (${undatedAll.length}) — visible quelle que soit l'année</div>
+      <div class="no-date-bubbles">
+        ${undatedAll.map(idea => {
+          const th = THEMES[idea.theme] || THEMES.autre;
+          return `<span class="t-bubble" style="background:${th.color}">${th.icon} ${esc(idea.title.length>22?idea.title.slice(0,20)+'…':idea.title)}</span>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  c.innerHTML = html;
+}
+
+// ══════════════
+// RENDER KANBAN
+// ══════════════
+function renderKanban() {
+  const board = document.getElementById('kanban-board');
+  board.innerHTML = Object.entries(THEMES).map(([key, th]) => {
+    const items = ideas.filter(i=>i.theme===key).sort((a,b)=>{
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return new Date(a.date)-new Date(b.date);
+    });
+    return `<div class="k-col">
+      <div class="k-col-header" style="background:${th.color}">
+        <span>${th.icon} ${th.label}</span>
+        <span class="k-count">${items.length}</span>
+      </div>
+      <div class="k-col-body">
+        ${items.length ? items.map(idea => {
+          const u = USERS[idea.who]||USERS.ahmed;
+          const dateStr = idea.date ? new Date(idea.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}) : '';
+          return `<div class="k-card" style="border-left-color:${th.color}">
+            <div class="k-card-title">${esc(idea.title)}</div>
+            <div class="k-card-meta">
+              ${dateStr?`<span class="card-date" style="font-size:0.72rem">📅 ${dateStr}</span>`:''}
+              <span style="font-size:0.7rem;font-weight:600;color:${u.color};background:${u.bg};padding:2px 6px;border-radius:8px">${u.label}</span>
+            </div>
+            ${idea.url?`<a href="${esc(idea.url)}" target="_blank" rel="noopener" class="card-link" style="font-size:0.76rem;margin-top:5px;display:block">🔗 Lien</a>`:''}
+          </div>`;
+        }).join('') : `<div style="color:#ccc;font-size:0.78rem;text-align:center;padding:14px 0">Aucune idée</div>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════
+// UTILS
+// ══════════════
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ══════════════
+// OFFLINE DETECT
+// ══════════════
+window.addEventListener('online',  () => { document.getElementById('offline-banner').classList.remove('show'); setSyncStatus('online'); });
+window.addEventListener('offline', () => { document.getElementById('offline-banner').classList.add('show'); setSyncStatus('offline'); });
+
+// ══════════════
+// SERVICE WORKER
+// ══════════════
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(console.warn);
+}
+
+// ══════════
+// INIT
+// ══════════
+initUser();
+initFirebase();
+</script>
+</body>
+</html>
